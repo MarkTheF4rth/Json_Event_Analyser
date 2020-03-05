@@ -3,18 +3,32 @@ splits ringdump.json, naming them by their unix time followed by their hash
 I know this was done, but the other one isn`t sorted by time
 '''
 import os
-import json
+import pika
+import time
+
+ROUTING_KEY = 'events'
+
+connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+channel = connection.channel()
+
+channel.queue_declare(queue=ROUTING_KEY)
 
 def splitter(json_file, write_dir, limit):
     counter = 0
     for line in open(json_file, 'r'):
-        x = json.loads(line)
-        print(x)
-        name = str(x['time'])+'|'+x['_id']['$oid']+'.json'
-        with open(os.path.join(write_dir, name), 'w') as new_file:
-            new_file.write(line)
         counter += 1
+
+        channel.basic_publish(exchange='',
+                              routing_key=ROUTING_KEY,
+                              body=line,
+                              properties = pika.BasicProperties(delivery_mode=2))
+        print(line)
+
         if counter > limit:
             break
 
-splitter('ringdump-with-elements.json', 'timeorderedringdumptest', 100000)
+        time.sleep(1)
+
+
+splitter('ringdump-with-elements.json', 'timeorderedringdumptest', 100)
+connection.close()
